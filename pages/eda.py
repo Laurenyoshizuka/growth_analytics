@@ -24,79 +24,45 @@ def load_data():
     base_path = os.path.dirname(os.path.abspath(__file__))
     base_path = os.path.dirname(base_path)
     
-    data_folder = os.path.join(base_path, 'data')
+    db_url = "https://raw.githubusercontent.com/Laurenyoshizuka/growth_analytics/168c1e72f0d496d164af547c5935a74ddc66e909/db/database.db"
+    
     db_folder = os.path.join(base_path, 'db')
-
-    if not os.path.exists(data_folder):
-        st.error(f"Data folder not found at {data_folder}")
-        return {}
-
-    if not os.path.exists(db_folder):
-        os.makedirs(db_folder)
-
     db_path = os.path.join(db_folder, 'database.db')
-    duckdb_path = os.path.join(db_folder, 'duckdb.db')
+    
+    if not os.path.exists(db_path):
+            st.info("Database not found locally. Downloading from GitHub...")
+            
+            # If the database doesn't exist locally, download it from GitHub
+            try:
+                os.makedirs(db_folder, exist_ok=True)
+                response = requests.get(db_url)
+                if response.status_code == 200:
+                    with open(db_path, 'wb') as db_file:
+                        db_file.write(response.content)
+                    st.success("Database downloaded successfully.")
+                else:
+                    st.error(f"Failed to download database. Status code: {response.status_code}")
+                    return {}
+            except Exception as e:
+                st.error(f"Failed to download database: {e}")
+                return {}
 
     data_frames = {}
     
-    # Check if database already exists
     db_exists = os.path.exists(db_path)
 
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
-        if db_exists:
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-            existing_tables = [table[0] for table in cursor.fetchall()]
-            
-            for table_name in existing_tables:
-                df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
-                data_frames[table_name] = df
-                if page == 'eda.py':
-                    st.info(f"Loaded existing table '{table_name}' from database.")
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        existing_tables = [table[0] for table in cursor.fetchall()]
         
-        if not db_exists or len(existing_tables) == 0:
-            csv_files = [f for f in os.listdir(data_folder) if f.endswith('.csv')]
-
-            for file_name in csv_files:
-                file_path = os.path.join(data_folder, file_name)
-
-                if not os.path.exists(file_path):
-                    st.error(f"File not found: {file_path}")
-                    continue  
-
-                try:
-                    table_name = os.path.splitext(file_name)[0]
-
-                    cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}';")
-                    table_exists = cursor.fetchone()
-                    
-                    # Only create the table if it doesn't exist
-                    if not table_exists:
-                        # Special handling for market_data
-                        if table_name == "market":
-                            df = pd.read_csv(file_path, skiprows=4).dropna(axis=1, how="all")
-                        else:
-                            df = pd.read_csv(file_path)
-                        
-                        df.to_sql(table_name, conn, if_exists='replace', index=False)
-                        data_frames[table_name] = df
-                        
-                        if page == 'eda.py':
-                            st.success(f"Data from {file_name} loaded and stored as '{table_name}' table successfully!")
-                    else:
-                        # If table exists and not already loaded, load it
-                        if table_name not in data_frames:
-                            df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
-                            data_frames[table_name] = df
-                            
-                        if page == 'eda.py':
-                            st.info(f"Table '{table_name}' already exists, using existing data.")
-
-                except Exception as e:
-                    if page == 'eda.py':
-                        st.error(f"Error loading {file_name}: {e}")
+        for table_name in existing_tables:
+            df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
+            data_frames[table_name] = df
+            if 'eda.py' in locals():
+                st.info(f"Loaded existing table '{table_name}' from database.")
         
         # try:
         #     ddb_conn = duckdb.connect(duckdb_path)
