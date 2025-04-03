@@ -5,6 +5,7 @@ description = ""
 authors = [
     {name = "Laurenyoshizuka",email = "laurenyoshizuka@gmail.com"}
 ]
+package = false  
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
