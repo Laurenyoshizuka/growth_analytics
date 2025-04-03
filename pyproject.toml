@@ -5,6 +5,7 @@ description = ""
 authors = [
     {name = "Laurenyoshizuka",email = "laurenyoshizuka@gmail.com"}
 ]
+package-mode = false
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -18,8 +19,5 @@ dependencies = [
 
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.poetry]
-packages = [{ include = "growth_analytics" }]
