@@ -29,7 +29,7 @@ def load_data():
 
     if not os.path.exists(data_folder):
         st.error(f"Data folder not found at {data_folder}")
-        return
+        return {}
 
     if not os.path.exists(db_folder):
         os.makedirs(db_folder)
@@ -38,56 +38,65 @@ def load_data():
     duckdb_path = os.path.join(db_folder, 'duckdb.db')
 
     data_frames = {}
+    
+    # Check if database already exists
+    db_exists = os.path.exists(db_path)
 
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        csv_files = [f for f in os.listdir(data_folder) if f.endswith('.csv')]
+        
+        if db_exists:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            existing_tables = [table[0] for table in cursor.fetchall()]
+            
+            for table_name in existing_tables:
+                df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
+                data_frames[table_name] = df
+                if page == 'eda.py':
+                    st.info(f"Loaded existing table '{table_name}' from database.")
+        
+        if not db_exists or len(existing_tables) == 0:
+            csv_files = [f for f in os.listdir(data_folder) if f.endswith('.csv')]
 
-        for file_name in csv_files:
-            file_path = os.path.join(data_folder, file_name)
+            for file_name in csv_files:
+                file_path = os.path.join(data_folder, file_name)
 
-            if not os.path.exists(file_path):
-                st.error(f"File not found: {file_path}")
-                continue  
+                if not os.path.exists(file_path):
+                    st.error(f"File not found: {file_path}")
+                    continue  
 
-            try:
-                table_name = os.path.splitext(file_name)[0]
+                try:
+                    table_name = os.path.splitext(file_name)[0]
 
-                # Special handling for market_data
-                if table_name == "market":
-                    df = pd.read_csv(file_path, skiprows=4).dropna(axis=1, how="all")
                     cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}';")
                     table_exists = cursor.fetchone()
                     
+                    # Only create the table if it doesn't exist
                     if not table_exists:
+                        # Special handling for market_data
+                        if table_name == "market":
+                            df = pd.read_csv(file_path, skiprows=4).dropna(axis=1, how="all")
+                        else:
+                            df = pd.read_csv(file_path)
+                        
                         df.to_sql(table_name, conn, if_exists='replace', index=False)
-                        if page == 'eda.py':
-                            st.success(f"Market Data loaded and stored as '{table_name}' table successfully!")
-                    else:       
-                        if page == 'eda.py':
-                            st.info(f"Table '{table_name}' already exists, skipping.")
-                
-                else:
-                    df = pd.read_csv(file_path)
-                    cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}';")
-                    table_exists = cursor.fetchone()
-                    
-                    if not table_exists:
-                        df.to_sql(table_name, conn, if_exists='replace', index=False)
+                        data_frames[table_name] = df
+                        
                         if page == 'eda.py':
                             st.success(f"Data from {file_name} loaded and stored as '{table_name}' table successfully!")
                     else:
+                        # If table exists and not already loaded, load it
+                        if table_name not in data_frames:
+                            df = pd.read_sql(f"SELECT * FROM {table_name}", conn)
+                            data_frames[table_name] = df
+                            
                         if page == 'eda.py':
-                            st.info(f"Table '{table_name}' already exists, skipping.")
+                            st.info(f"Table '{table_name}' already exists, using existing data.")
 
-                data_frames[table_name] = df
-
-            except Exception as e:
-                if page == 'eda.py':
-                    st.error(f"Error loading {file_name}: {e}")
-        
-        
+                except Exception as e:
+                    if page == 'eda.py':
+                        st.error(f"Error loading {file_name}: {e}")
         
         # try:
         #     ddb_conn = duckdb.connect(duckdb_path)
