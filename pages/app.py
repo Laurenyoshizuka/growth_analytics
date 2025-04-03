@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.set_page_config(page_title="Data Explorer", layout="wide")
+st.set_page_config(page_title="Growth Analytics", layout="wide")
 
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["EDA", "Outbound Sizing", "Attribution Model"])
