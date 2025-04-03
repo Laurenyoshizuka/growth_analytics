@@ -1,0 +1,5 @@
+[server]
+enableStaticServing = true
+
+[runner]
+installCommand = "pip install -r requirements.txt"
